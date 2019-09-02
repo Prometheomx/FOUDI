@@ -1,0 +1,24 @@
+/**
+ * My asset signing network
+ */
+namespace org.example.signedassetsnetwork
+asset Document identified by idDocument {
+    o String idDocument
+    o String hashOriginal
+    --> Firmador firmador optional
+}
+participant Firmador identified by firmadorId {
+    o String firmadorId
+    o String name
+    o String lastName
+    o String certificate
+    o String firma
+}
+
+transaction AgregarFirmador {
+    --> Document document
+    --> Firmador firmador
+}
+event NotificacionFirmador {
+    --> Document document     
+}

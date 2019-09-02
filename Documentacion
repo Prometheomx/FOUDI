@@ -1,0 +1,187 @@
+Para consultar el PDF con informacion mas visual, visita el siguiente apartado:  -> https://drive.google.com/open?id=13_GXu1mBb6REC_jiuDw3W4xqNpPeAACQ
+
+
+Hyperledger Fabric con Hyperledger Composer
+
+Propósito
+
+Este documento contiene los elementos para la implementación de una POC sobre la firma de documentos utilizando Hyperledger Fabric y la herramienta de Hyperledger Composer para definir una red de negocios. La parte complementaria de la POC está implementada con una aplicación cliente en .net en C# la cual se conecta con Hyperledger Fabric. La aplicación cliente consume las APIs expuestas para realizar la firma del documento, también consume ciertas APIs para hacer búsquedas dentro de blockchain y validar si un documento se encuentra firmado en Hyperledger Fabric.
+Importante:
+Este documento solamente detalla la generación de un BNA (Business Network Definition) para realizar la implementación de la red, es necesario consultar otro documento que contiene los pasos para construir una red de Hyperledger Fabric a partir de un BNA y consultar el código del consumo de las APIs desde una aplicación cliente en Github.
+
+Arquitectura 
+
+La arquitectura consiste en una instancia EC2 en AWS la cual contiene la infraestructura de la red de Hyperledger Fabric en contenedores de Docker. La instancia EC2 está dentro de un Security Group el cual a su vez se encuentra dentro de una Subnet. En AWS es necesario una VPC para construir una Subnet, la VPC se construye dentro de un segmento en una zona de disponibilidad ubicada en una región de AWS. 
+La aplicación cliente consume las APIs a través de una IP pública que expone un REST Server dentro de un contenedor o Peer 1 en el caso del diagrama. Las peticiones llegan a un Internet Gateway que redirecciona el trafico hacia el Peer que contiene el servidor que está proporcionando las APIs dentro de la red de hyperledger.
+
+ 
+
+
+BNA
+
+El BNA o Business Network Definition es un conjunto de archivos que definen la red de negocio en Hyperledger Fabric, el BNA se construye mediante la herramienta denominada Hyperledger Composer y existen cuatro archivos importantes en Hyperledger Composer que debemos elaborar para que se defina la red completamente. 
+Model File
+
+El model file o archivo de modelado es un archivo con extensión .cto en donde se definen los esquemas. Este lenguaje de modelado es orientado a objetos, donde se manejan nombres de espacio, variables, tipos de dato, herencia, importaciones, tipos primitivos, arreglos y otras características que no tocaremos a fondo en este documento. Los esquemas principales que se definen son: transacciones, eventos, activos y participantes. En esta POC definimos el activo principal que es el documento al cual identificamos por un id único. El participante lo definimos como firmante, este participante será quien realice el firmado de los documentos y al igual que el activo lo identificamos con un id único. Para las transacciones es necesario definir las partes que interactúan en la transacción, en nuestro caso lo que definimos es un activo y un participante que son los que mencionamos anteriormente como el firmante y el documento, la transacción consiste en agregar un firmante al documento. Finalmente, los eventos también deben definirse. Se define un evento que prácticamente se dispara cuando se agrega un firmante a un documento, lo que definimos es solamente una instancia del documento para que el evento detecte cuando el documento es modificado al agregar el firmante. A continuación, en la imagen podemos observar como definir los elementos y la sintaxis que utiliza Hyperledger Composer. 
+
+Como se puede notar en la imagen, agregamos propiedades adicionales. En el activo almacenamos el hash original del documento y ponemos al firmante como opcional ya que primero generamos el documento y posteriormente le agregamos el firmante. El firmante también contiene otros parámetros que nos interesan como el nombre, certificado que usó para la firma y la firma del documento.
+Script File
+
+El archivo de script se encarga de la lógica de negocio, el script está programado en JavaScript y contiene la lógica de la transacción que se definió en nuestro modelo como AgregarFirmador. La transacción tiene como propósito agregar a un participante o firmante a un documento para mostrar que el archivo fue firmado por el mismo.
+
+
+
+En la imagen se muestra el código del script el cual realiza tres procesos importantes:
+1.	Agrega el firmante al documento 
+2.	Emite una notificación sobre el evento ocurrido 
+3.	Persiste el estado del documento
+
+Query File
+
+El archivo de consultas es otro de los archivos a implementar, como lo dice su nombre es útil para definir consultas que nos sirvan de acorde a lo que se esté desarrollando. En nuestro archivo de lo que se define son tres consultas.
+
+
+La primera consulta que se define es para extraer todos los documentos que se encuentren almacenados, al decir documentos no significa que son los documentos físicos, recordemos que estamos almacenando solamente ciertas propiedades de estos. La segunda consulta es para extraer los documentos en base al propietario o firmante. Finalmente, la última consulta es para obtener un documento basado en el hash original del mismo esto nos servirá para validar si un documento existe dentro de la red. 
+
+ACL
+
+El último archivo necesario para tener nuestro BNA completo es el Access Control List o ACL. En este archivo definimos los permisos de los participantes dentro de la red y las reglas que aplican para los recursos. No nos meteremos a fondo en este archivo ya que en esta POC solamente tenemos una organización. Por esta ocasión, daremos permiso al administrador de la red a todos los recursos por default.
+
+
+Conclusión
+
+Ahora con el BNA completo puedes empezar a jugar con Hyperledger Composer Playground en la creación de participantes, documentos, realizar la transacción de agregar un firmante y ver los eventos que se generan. Para ver la funcionalidad completa y visual será necesario la parte complementaria de este tutorial para montar tu propia red y visualizar las APIs REST para consumirlas directamente desde el navegador o un aplicativo.   
+
+
+Construir la red con Hyperledger Composer
+Antes de empezar nosotros reconmendamos usar la aplicacion “bitvise ssh client” para manipular nuestra maquina ya que se encuentra en AWS. Descargamos la pem, y la agregamos en el client key manager y el usuario es ubuntu.
+Ya que temenos el archive .BNA en nuestra computadora procedemos a construer la red donde lo vamos a montar, en este caso lo usaremos con ubuntu 16 ya que es de las versions probadas mas estables.
+
+a continuacion en nuestra consola escribimos los siguientes commandos:
+
+“ este commando nos permite bajar todos los requisites para la instalacion de una red hyperledger para poder desplegar nuestro archive BNA
+$ curl -O https://hyperledger.github.io/composer/v0.19/prereqs-ubuntu.sh
+$ chmod u+x prereqs-ubuntu.sh
+$ ./prereqs-ubuntu.sh
+
+Este comando nos instala:
+Node:           v8.16.0
+npm:            6.4.1
+Docker:         Docker version 18.09.5, build e8ff056
+Docker Compose: docker-compose version 1.13.0, build 1719ceb
+Python:         Python 2.7.12
+
+Después de que se complete este comando hay que cerrar sesión en la consola y volverlo a abrir.
+Agregamos también este comando que nos permite usar Docker sin necesitar root
+$ sudo usermod -a -G docker $USER
+Después instalamos los componentes de composer que nos ayudaran a gestionar la red 
+$ npm install -g composer-cli@0.19
+$ npm install -g composer-rest-server@0.19
+$ npm install -g generator-hyperledger-composer@0.19
+$ npm install -g yo
+
+Después creamos una carpeta para trabajar dentro de ella
+
+$ mkdir ~/fabric-dev-servers && cd ~/fabric-dev-servers
+
+ya dentro de la carpeta fabric-dev-servers descargamos todos los archivos necesarios para iniciar nuestra red.
+
+
+$ curl -O https://raw.githubusercontent.com/hyperledger/composer-tools/master/packages/fabric-dev-servers/fabric-dev-servers.tar.gz
+
+Se descarga y luego la descomprimimos con el siguiente comando:
+$ tar -xvf fabric-dev-servers.tar.gz
+
+ya que descomprimimos todos los archivos necesarios tenemos que exportar la versión especifica de la fabric que quermos usar en este caso será la 1.1.
+
+$ export FABRIC_VERSION=hlfv11
+Para descargar todos los archivos necesarios para levantar una red de hyperledger composer
+$ sudo ./downloadFabric.sh
+hasta este momento hemos instalado todo lo necesario para el entorno de desarrollador típico. Vamos a seguir al siguiente paso
+
+Controlando tu entorno de desarrollo
+
+Para iniciar con la red ejecutamos el siguiente comando 
+$ sudo ./startFabric.sh
+
+luego de que la red esta funcionando tenemos que crear credenciales para este nuevo Peer.
+
+
+$ ./createPeerAdminCard.sh
+
+Nos generara las credenciales necesarias para comunicarnos con los archivos del composer y manipular el funcionamiento y creación de la red.
+
+
+Hyperledger fabric por defecto crea credenciales desde que iniciamos la red, las cuales nos sirven para comenzar a manipularla PeerAdmin@hlfv1
+
+
+Crear una estructura de negocios 
+
+El concepto clave para Hyperledger Composer es la definición de red de negocios (BND). 
+Define el modelo de datos, la lógica de transacción y las reglas de control de acceso para su solución de blockchain. Para crear un BND, necesitamos crear una estructura de proyecto adecuada en el disco.
+
+La forma más fácil de comenzar es usar el generador de Yeoman para crear una red empresarial esquelética. Esto creará un directorio que contiene todos los componentes de una red de negocios.
+
+$ yo hyperledger-composer:businessnetwork
+
+cuando ejecutemos este comando nos pedirá los siguientes requisitos
+
+(para este tutorial hay que asignar los mismos valores en verde)
+
+1 Business network name: assetsigning-network_v4
+2 Description: blockchain hyperledger de prueba version 1
+3 Author name:  Oscar Roman & Israel Abarca
+4 Author email: Hyperledger@latam.com
+5 License: Apache-2.0
+6 Namespace: org.example.signedassetsnetwork
+7 Do you want to generate an empty template network? (Use arrow keys)
+  Yes: generate an empty template network 
+❯ No: generate a populated sample network
+
+Y con esta información ya creamos nuestra red de negocio :D 
+ 
+Ahora dentro de nuestro fichero establecemos nuestro archivo BNA creado anteriormente.
+
+
+Despliegue de la red 
+La implementación de una red de negocios en el Hyperledger Fabric requiere que la red de negocios de Hyperledger Composer se instale en el Peer, luego se puede iniciar la red de negocios y se debe crear una nueva associated card, y asociarla para que sea el administrador de la red. 
+Finalmente, la tarjeta de red empresarial del administrador de red debe importarse para su uso, y luego se puede hacer ping a la red para verificar que está respondiendo.
+Debemos situarnos dentro del directorio para ejecutar el siguiente comando:
+
+
+$ composer network install --card PeerAdmin@hlfv1 --archiveFile assetsigning-network_v4.bna
+
+ahora ya que instalamos la tarjeta de credenciales al .BNA, vamos a deployar la red con el siguiente comando:
+
+$ composer network start --networkName assetsigning-network --networkVersion 0.0.2-deploy.40 --networkAdmin admin --networkAdminEnrollSecret adminpw --card PeerAdmin@hlfv1 --file networkadmin.card
+
+si todo sale bien veremos algo como lo siguiente:
+ 
+El composer network start requiere una tarjeta de red de negocios, así como el nombre de la identidad de administrador de la red de negocios, el nombre y la versión de la red de negocios y el nombre del archivo que se creará listo para importar como una tarjeta de red de negocios.
+
+Para importar la identidad del administrador de red como una tarjeta de red comercial utilizable, ejecute el siguiente comando:
+
+$  composer card import --file networkadmin.card
+
+Para verificar que la red de negocios se haya implementado correctamente, ejecute el siguiente comando para hacer ping a la red:
+
+$  composer network ping --card admin@assetsigning-network
+ 
+Ya que tenemos una red trabajando con una tarjeta de identificación dentro de un Peer, vamos a crear un servidor Rest, y después una aplicación que corra con este servidor.
+
+$ composer-rest-server
+
+Y seleccionamos las siguientes opciones:
+? Enter the name of the business network card to use: admin@assetsigning-network
+? Specify if you want namespaces in the generated REST API: never use namespaces
+? Specify if you want to use an API key to secure the REST API: No
+? Specify if you want to enable authentication for the REST API using Passport: No
+? Specify if you want to enable the explorer test interface: Yes
+? Specify a key if you want to enable dynamic logging: 
+? Specify if you want to enable event publication over WebSockets: Yes
+? Specify if you want to enable TLS security for the REST API: No
+
+En este momento, ya tenemos nuestro servidor rest, corriendo en nuestro localhost:3000
+Se vería de la siguiente manera:
+ 
+En este momento podemos interactuar directamente con la red de hyperledger composer desde nuestro navegador, en este caso en especial creamos una aplicación .exe, con la cual interactuamos con la red.

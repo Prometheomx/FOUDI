@@ -1,0 +1,22 @@
+/**
+ * Queries from Documents
+ */
+query selectDocs {
+  description: "Select all documents"
+  statement:
+      SELECT org.example.signedassetsnetwork.Document
+}
+
+query selectDocsByOwner {
+  description: "Select all docs based on their owner"
+  statement:
+      SELECT org.example.signedassetsnetwork.Document
+          WHERE (firmador == _$firmador)
+}
+
+query selectDocsByHash {
+  description: "Select all docs based on their original hash"
+  statement:
+  	  SELECT org.example.signedassetsnetwork.Document
+          WHERE (hashOriginal == _$hashOriginal)
+}
