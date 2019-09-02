@@ -1,6 +1,6 @@
 # FOUDI
 Firma de Documentos Digitales
-Autor: Prometheo
+Autor: Prometheo - Anteriormente Hyperledger Latam.
 
 El documento PDF, tiene explicaciones más específicas sobre como implementar este proyecto.
 Ya que Github no permite subir archivos .exe, dejamos la liga a el codigo fuente y la aplicacion exe en este enlace -> http://bit.ly/2IZgwiE
